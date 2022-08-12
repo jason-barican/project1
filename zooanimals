@@ -1,0 +1,285 @@
+/* Name: Jason Barican   */              
+   
+
+
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#define NAME_LEN 100
+#define LENGTH 1000
+
+// below are two separate structures for storing the variables for the data file and the log file
+struct data {
+	char name[NAME_LEN + 1];
+	char location[256];
+	int number;
+};
+
+struct log {
+	char op[256];
+	char name[NAME_LEN + 1];
+	char location[256];
+	int number;
+
+	char location2[256];
+	
+};
+
+int read_file(FILE *file, struct data data1[]) {
+
+	char temp[256];
+	int i = 0;
+
+	//read file reads through all lines of database file until it reaches the EOF
+	//i is incremented every loop iteration, and when the file = "EOF", datacount will be equal to i, which represents the number of lines in datafile.
+	while (fgets(temp, 256, file) != NULL) {
+		char *part = strtok(temp, ","); //strtok divides the line everytime there is a comma, and sets everything before it as a value in 'part'
+		strcpy(data1[i].name, part); //copies value in part into the struct array
+
+		part = strtok(NULL, ",");
+		strcpy(data1[i].location, part);
+
+		int numberpart = atoi(strtok(NULL, ",")); //separate var. named "numberpart" for int value in struct array
+		data1[i].number = numberpart;
+		i++;
+	} int datacount = i;
+	return datacount; //returns datacount value
+
+}
+
+
+int read_file2(FILE *log, struct log log1[], int count) {
+
+	char temp[256];
+	int i = 0;
+	count = 0;
+
+	while (fgets(temp, 256, log) != NULL) {
+		char *part = strtok(temp, ",");
+		strcpy(log1[i].op, part);
+
+
+		//separate if loop conditions for reading logfile, since some operations contain different variables
+		if (strcmp(log1[i].op, "transfer_in") == 0) { //when the operation is transfer_in, function reads operation, name, location, and number
+			part = strtok(NULL, ",");
+			strcpy(log1[i].name, part);
+
+			part = strtok(NULL, ",");
+			strcpy(log1[i].location, part);
+
+			int numberpart = atoi(strtok(NULL, ","));
+			log1[i].number = numberpart;
+			i++;
+
+		} else if (strcmp(log1[i].op, "relocate") == 0) { //when op is "relocate", function reads operation, location, and second location
+
+			part = strtok(NULL, ",");
+			strcpy(log1[i].location, part);
+
+			part = strtok(NULL, ",");
+			part[strcspn(part, "\n")] = '\0';
+			strcpy(log1[i].location2, part);
+			
+			i++;
+
+			
+
+		} else { //for all other operations, function reads operation, name, and number
+			part = strtok(NULL, ",");
+			strcpy(log1[i].name, part);
+
+			int numberpart = atoi(strtok(NULL, ","));
+			log1[i].number = numberpart;
+			i++;
+
+		}
+
+	} count = i; //count will represent logcount in main function later
+
+	return count; //returns value of count
+}	
+
+		
+//birth function
+int birth(struct data data1[], struct log log1[], int datacount, int maincount) {
+	
+	for (int i = 0; i < datacount; i++) {
+		if (strcmp(data1[i].name, log1[maincount].name) == 0) { //goes through every name in data1 struct to find the same name in the log operation
+			data1[i].number += log1[maincount].number;// once name is found, the number in the log struct array is added to the data struct array
+			
+			return datacount; 
+		}
+	}
+}
+
+
+int death(struct data data1[], struct log log1[], int datacount, int maincount) {
+
+	for (int i = 0; i < datacount; i++) { //same exact for loop as in birth, but subtracts instead of adds log number to data number
+		if (strcmp(data1[i].name, log1[maincount].name) == 0) {
+			data1[i].number -= log1[maincount].number;
+
+			if (data1[i].number <= 0) { //if the data number ever reaches zero, for loop erases the line and moves every other line after forward one space
+				for (; i < datacount; i++) {
+					data1[i] = data1[i+1];
+				} datacount -= 1; //subtracts 1 from datacount because one entire line was removed
+			} return datacount; //returns new value of datacount
+		}
+	}
+}
+
+
+int transfer_in(struct data data1[], struct log log1[], int datacount, int maincount) {
+    
+	for (int position = 0; position < datacount; position++) { //same for loop in birth, for same named animals
+		if (strcmp(data1[position].name, log1[maincount].name) == 0) {
+			data1[position].number += log1[maincount].number;
+			return datacount; //concludes function if transfer_in animal had the same name as an animal in datafile
+		}
+	} 
+
+	for (int position = 0; position < datacount; position++) { //if logfile animal is unique, it runs through two separate if loops
+		if (strcmp(log1[maincount].name, data1[position].name) < 0) { //goes through all animals in datafile, until it finds one that has a smaller value in strcmp
+			datacount++;
+			for (int i = datacount; i >= position; i--) { //expands the array one line until it reaches the position value
+				data1[i+1] = data1[i];
+			}
+			//once loop reaches position value, the transferred in animal is set into the struct array in value of position
+			strcpy(data1[position].name, log1[maincount].name);
+			strcpy(data1[position].location, log1[maincount].location);
+			data1[position].number = log1[maincount].number;
+			return datacount;
+
+		} else if (strcmp(log1[maincount].name, data1[position].name) > 0) { //else if is for if the transferred in animal is the last animal alphabetically
+			datacount++;
+			position = datacount;
+
+			//sets transferred in animal to final position in struct array
+			strcpy(data1[position-1].name, log1[maincount].name);
+			strcpy(data1[position-1].location, log1[maincount].location);
+			data1[position-1].number = log1[maincount].number;
+			return datacount;
+
+		}
+	}
+}
+
+
+
+int transfer_out(struct data data1[], struct log log1[], int datacount, int maincount) {
+
+	for (int i = 0; i < datacount; i++) { //same exact code in the death function
+		if (strcmp(data1[i].name, log1[maincount].name) == 0) {
+			data1[i].number -= log1[maincount].number;
+
+			if (data1[i].number <= 0) {
+				for (; i < datacount; i++) {
+					data1[i] = data1[i+1];
+				} datacount -= 1;
+			} return datacount;
+		}
+	}
+}
+
+
+void relocate(struct data data1[], struct log log1[], int datacount, int maincount) {
+	
+	for (int i = 0; i < datacount; i++) {
+		if (strcmp(data1[i].location, log1[maincount].location) == 0) { // everytime the for loop finds equal locations, it sets the datafile location equal 
+			strcpy(data1[i].location, log1[maincount].location2);		//  to the second location in logfile 
+
+		}
+	}
+}
+
+
+void print(FILE *file, struct data data1[], int datacount) {
+
+	for (int i = 0; data1[i].number != 0; i++) { //goes through all the lines in datafile and prints it in output file.
+		printf("%s,%s,%d\n", data1[i].name, data1[i].location, data1[i].number);
+	}
+}
+
+
+
+int main(int argc, char *argv[]) {
+
+	FILE *database; //opens database file to read only, reading the second value in argv array
+	database = fopen(argv[1], "r");
+
+	FILE *log; //opens log file to read only, reading the third value in argv array
+	log = fopen(argv[2], "r");
+
+	//declaration of counters
+	int datacount, logcount;
+
+	//declaration of struct arrays
+	struct data data1[256]; //(sorry, i can't think of any creative names for the struct arrays, so i just put a number after the struct name)
+	struct log log1[256];
+
+	
+
+	datacount = read_file(database, data1); //datacount value returned from function
+	logcount = read_file2(log, log1, logcount);//logcount value returned from function
+
+
+	for (int maincount = 0; maincount < logcount; maincount++) { //for loop goes through all lines of log file
+		char operation[256];
+		char op_initial;
+		strcpy(operation, log1[maincount].op);
+
+		//nested loops converts operations to single letters to be used in switch case
+		if (strcmp(operation, "birth") == 0) {
+			op_initial = 'b';
+		} else if (strcmp(operation, "death") == 0) {
+			op_initial = 'd';
+		} else if (strcmp(operation, "transfer_in") == 0) {
+			op_initial  = 'i';
+		} else if (strcmp(operation, "transfer_out") == 0) {
+			op_initial = 'o';
+		} else if (strcmp(operation, "relocate") == 0) {
+			op_initial = 'r';
+		}
+
+		switch (op_initial) {
+			case 'b' : //if 'b', birth function runs
+				datacount = birth(data1, log1, datacount, maincount);
+				break;
+
+			case 'd' : //if 'd', death function runs. and updates value of datacount
+				datacount = death(data1, log1, datacount, maincount);
+				break;
+
+			case 'i' : //if 'i', transfer in function runs. and updates value of datacount
+				datacount = transfer_in(data1, log1, datacount, maincount);
+                break;
+
+			case 'o' : //if 'o', transfer out function runs. and updates value of datacount
+				datacount = transfer_out(data1, log1, datacount, maincount);
+                break;
+
+			case 'r' : //if 'r', relocate function runs
+				relocate(data1, log1, datacount, maincount);
+                break;
+
+			default: printf("Illegal code\n");
+		}
+	}
+
+
+	/* two lines below are for output file
+	first one creates a write file for a file named database.txt
+	second file calls the function 'print' */
+
+	FILE *output = fopen("database.txt", "w");
+	print(output, data1, datacount);
+
+	//closes all three files below
+	fclose(database);
+	fclose(log);
+	fclose(output);
+
+	return 0; //returns 0, concluding the code
+
+}
